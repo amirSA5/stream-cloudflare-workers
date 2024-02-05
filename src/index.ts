@@ -73,18 +73,31 @@ app.get('/todos',async (c)=>{
   return c.json(items);
 })
 
-app.get('/todos/:user_id', async (c)=>{
-  const user_id=c.req.param('user_id');
-  const items= await c.env.STREAM_TODOS.list({prefix:user_id});
-  const todos= await Promise.all(items.keys.map(({name})=>{c.env.STREAM_TODOS.get(name)}));
-  return c.json(items);
+app.get('api/todos/:user_id', async (c)=>{
+  const userId=c.req.param('user_id');
+  const { results } = await c.env.DB.prepare(`
+    select * from todos where userId = ?
+  `).bind(userId).all()
+  return c.json(results);
 })
 
-app.post('/todos/:user_id', async (c)=>{
-  const user_id=c.req.param('user_id');
-  const todo= await c.req.json();
-  await c.env.STREAM_TODOS.put(user_id,JSON.stringify(todo));
-  return c.json({status:'ok'});
+app.post('api/todos/:user_id', async (c)=>{
+  const id = uuidv4();
+  const userId=c.req.param('user_id');
+  const {title,description}= await c.req.json();
+
+   const { success } = await c.env.DB.prepare(`
+    insert into todos (id, userId, title, description) values (?, ?, ?, ?)
+  `).bind(id, userId, title, description).run();
+
+  if (success) {
+    c.status(201)
+    return c.text("Created")
+  } else {
+    c.status(500)
+    return c.text("Something went wrong")
+  }
+  
 })
 
 
